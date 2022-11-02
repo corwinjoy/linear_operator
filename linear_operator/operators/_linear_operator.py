@@ -2139,6 +2139,19 @@ class LinearOperator(ABC):
     def shape(self):
         return self.size()
 
+    @property
+    def names(self):
+        nms = tuple(None for _ in range(len(self.shape)))
+        return nms
+
+    @property
+    def layout(self):
+        return torch.strided
+
+    def is_floating_point(self) -> bool:
+        z = torch.zeros(1, dtype=self.dtype)
+        return z.is_floating_point()
+
     @_implements(torch.linalg.solve)
     def solve(self, right_tensor: torch.Tensor, left_tensor: Optional[torch.Tensor] = None) -> torch.Tensor:
         r"""
