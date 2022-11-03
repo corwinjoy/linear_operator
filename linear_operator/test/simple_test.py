@@ -50,13 +50,13 @@ def test_matmul_fn():
     print("completed test_matmul_fn")
 
 
-class metaLinearOperatorType(type(LinearOperator), type(TensorTypeMixin)):
+class MetaLinearOperatorType(type(LinearOperator), type(TensorTypeMixin)):
     pass
 
 
 # Inherit from LinearOperator so that IDEs are happy to find methods on functions
 # annotated as LinearOperatorType.
-class LinearOperatorType(LinearOperator, TensorTypeMixin, metaclass=metaLinearOperatorType):
+class LinearOperatorType(LinearOperator, TensorTypeMixin, metaclass=MetaLinearOperatorType):
     base_cls = LinearOperator
 
 
