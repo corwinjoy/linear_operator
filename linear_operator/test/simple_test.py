@@ -22,16 +22,9 @@ def matmul_fn(
 ) -> Union[TensorType[..., "M", "C"], TensorType["M"]]:
     r"""
     Performs a matrix multiplication :math:`\mathbf KM` with the (... x M x N) matrix :math:`\mathbf K`
-    that this LinearOperator represents. Should behave as
+    that mat represents. Should behave as
     :func:`torch.matmul`. If the LinearOperator represents a batch of
     matrices, this method should therefore operate in batch mode as well.
-
-    ..note::
-        This method is intended to be used only internally by various
-        Functions that support backpropagation (e.g., :class:`Matmul`).
-        Once this method is defined, it is strongly recommended that one
-        use :func:`~linear_operator.LinearOperator.matmul` instead, which makes use of this
-        method properly.
 
     :param mat: the K = MxN left hand matrix
     :param vec: the matrix :math:`\mathbf M` to multiply with (... x N x C).
@@ -66,18 +59,11 @@ def linop_matmul_fn(
 ) -> Union[TensorType[..., "M", "C"], TensorType["M"]]:
     r"""
     Performs a matrix multiplication :math:`\mathbf KM` with the (... x M x N) matrix :math:`\mathbf K`
-    that this LinearOperator represents. Should behave as
+    that lo represents. Should behave as
     :func:`torch.matmul`. If the LinearOperator represents a batch of
     matrices, this method should therefore operate in batch mode as well.
 
-    ..note::
-        This method is intended to be used only internally by various
-        Functions that support backpropagation (e.g., :class:`Matmul`).
-        Once this method is defined, it is strongly recommended that one
-        use :func:`~linear_operator.LinearOperator.matmul` instead, which makes use of this
-        method properly.
-
-    :param mat: the K = MxN left hand matrix
+    :param lo: the K = MxN left hand matrix
     :param vec: the matrix :math:`\mathbf M` to multiply with (... x N x C).
     :return: :math:`\mathbf K \mathbf M` (... x M x C)
     """
