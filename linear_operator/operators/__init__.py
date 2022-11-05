@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from ._linear_operator import LinearOperator, to_dense
+from ._linear_operator import LinearOperator, LinearOperatorType, to_dense
 from .added_diag_linear_operator import AddedDiagLinearOperator
 from .batch_repeat_linear_operator import BatchRepeatLinearOperator
 from .block_diag_linear_operator import BlockDiagLinearOperator
@@ -38,6 +38,7 @@ __all__ = [
     "to_linear_operator",
     "cat",
     "LinearOperator",
+    "LinearOperatorType",
     "AddedDiagLinearOperator",
     "BatchRepeatLinearOperator",
     "BlockLinearOperator",

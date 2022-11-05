@@ -12,6 +12,8 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
+from torchtyping import TensorType  # type: ignore
+from torchtyping import TensorTypeMixin
 
 import linear_operator
 
@@ -138,8 +140,11 @@ class LinearOperator(ABC):
     ####
     # The following methods need to be defined by the LinearOperator
     ####
+
     @abstractmethod
-    def _matmul(self, rhs: torch.Tensor) -> torch.Tensor:
+    def _matmul(
+        self: LinearOperatorType[..., "M", "N"], rhs: Union[TensorType[..., "N", "C"], TensorType["N"]]
+    ) -> Union[TensorType[..., "M", "C"], TensorType["M"]]:
         r"""
         Performs a matrix multiplication :math:`\mathbf KM` with the (... x M x N) matrix :math:`\mathbf K`
         that this LinearOperator represents. Should behave as
@@ -2728,6 +2733,16 @@ class LinearOperator(ABC):
         return self.div(other)
 
 
+class MetaLinearOperatorType(type(LinearOperator), type(TensorTypeMixin)):
+    pass
+
+
+# Inherit from LinearOperator so that IDEs are happy to find methods on functions
+# annotated as LinearOperatorType.
+class LinearOperatorType(LinearOperator, TensorTypeMixin, metaclass=MetaLinearOperatorType):
+    base_cls = LinearOperator
+
+
 def _import_dotted_name(name: str):
     components = name.split(".")
     obj = __import__(components[0])
@@ -2752,4 +2767,4 @@ def to_dense(obj: Union[LinearOperator, torch.Tensor]) -> torch.Tensor:
 
 _deprecate_renamed_methods(LinearOperator, inv_quad_log_det="inv_quad_logdet", log_det="logdet")
 
-__all__ = ["LinearOperator", "to_dense"]
+__all__ = ["LinearOperator", "LinearOperatorType", "to_dense"]

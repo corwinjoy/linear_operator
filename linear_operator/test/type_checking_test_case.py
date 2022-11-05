@@ -7,10 +7,9 @@ from typing import Union
 import torch
 from torchtyping import TensorType  # type: ignore
 from torchtyping import patch_typeguard
-from torchtyping.tensor_type import TensorTypeMixin  # type: ignore
 from typeguard import typechecked
 
-from linear_operator.operators import DenseLinearOperator, LinearOperator
+from linear_operator.operators import DenseLinearOperator, LinearOperatorType
 
 # For flake8, matrix dimensions
 M = None
@@ -18,16 +17,6 @@ C = None
 N = None
 
 patch_typeguard()  # use before @typechecked
-
-
-class MetaLinearOperatorType(type(LinearOperator), type(TensorTypeMixin)):
-    pass
-
-
-# Inherit from LinearOperator so that IDEs are happy to find methods on functions
-# annotated as LinearOperatorType.
-class LinearOperatorType(LinearOperator, TensorTypeMixin, metaclass=MetaLinearOperatorType):
-    base_cls = LinearOperator
 
 
 @typechecked
