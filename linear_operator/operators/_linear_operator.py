@@ -84,7 +84,7 @@ def _implements_symmetric(torch_function: Callable) -> Callable:
     """
 
     @functools.wraps(torch_function)
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         # Hack: we store the name of the function, not the actual function
         # This makes it so that torch_function can map to subclass versions of functions,
         #   rather than always mapping to the superclass function
@@ -178,7 +178,7 @@ class LinearOperator(ABC):
         raise NotImplementedError("The class {} requires a _size function!".format(self.__class__.__name__))
 
     @abstractmethod
-    def _transpose_nonbatch(self) -> LinearOperator:
+    def _transpose_nonbatch(self: LinearOperatorType[..., "M", "N"]) -> LinearOperatorType[..., "N", "M"]:
         """
         Transposes non-batch dimensions (e.g. last two)
         Implement this method, rather than transpose() or t().
@@ -335,7 +335,7 @@ class LinearOperator(ABC):
         :param left_vecs: The vectors :math:`\mathbf U = [\mathbf u_1, \ldots, \mathbf u_D]`
         :param right_vecs: The vectors :math:`\mathbf V = [\mathbf v_1, \ldots, \mathbf v_D]`
         :return: Derivative with respect to the arguments (:math:`\boldsymbol \theta`) that
-            represent this this LinearOperator.
+            represent this LinearOperator.
         """
         from collections import deque
 
@@ -446,7 +446,7 @@ class LinearOperator(ABC):
     def _args(self, args: Tuple[Union[torch.Tensor, "LinearOperator"], ...]) -> None:
         self._args_memo = args
 
-    def _approx_diagonal(self) -> torch.Tensor:
+    def _approx_diagonal(self: LinearOperatorType[..., "N"]) -> TensorType[..., "N"]:
         """
         (Optional) returns an (approximate) diagonal of the matrix
 
@@ -518,7 +518,7 @@ class LinearOperator(ABC):
             return "cholesky"
         return "lanczos"
 
-    def _diagonal(self) -> torch.Tensor:
+    def _diagonal(self: LinearOperatorType[..., "N"]) -> TensorType[..., "N"]:
         r"""
         As :func:`torch._diagonal`, returns the diagonal of the matrix
         :math:`\mathbf A` this LinearOperator represents as a vector.
@@ -531,9 +531,11 @@ class LinearOperator(ABC):
         row_col_iter = torch.arange(0, self.matrix_shape[-1], dtype=torch.long, device=self.device)
         return self[..., row_col_iter, row_col_iter]
 
-    def _mul_constant(self, other: Union[float, torch.Tensor]) -> LinearOperator:
+    def _mul_constant(
+        self: LinearOperatorType[..., "M", "N"], other: Union[float, torch.Tensor]
+    ) -> LinearOperatorType[..., "M", "N"]:
         """
-        Multiplies the LinearOperator by a costant.
+        Multiplies the LinearOperator by a constant.
 
         ..note::
             This method is used internally by the related function
@@ -546,7 +548,10 @@ class LinearOperator(ABC):
 
         return ConstantMulLinearOperator(self, other)
 
-    def _mul_matrix(self, other: Union[torch.Tensor, "LinearOperator"]) -> LinearOperator:
+    def _mul_matrix(
+        self: LinearOperatorType[..., "M", "N"],
+        other: Union[TensorType[..., "N", "C"], LinearOperatorType[..., "N", "C"]],
+    ) -> LinearOperatorType[..., "M", "C"]:
         r"""
         Multiplies the LinearOperator by a (batch of) matrices.
 
@@ -566,7 +571,7 @@ class LinearOperator(ABC):
         else:
             return MulLinearOperator(self, other)
 
-    def _preconditioner(self) -> Tuple[Callable, "LinearOperator", torch.Tensor]:
+    def _preconditioner(self) -> Tuple[Callable, LinearOperatorType[..., "M", "N"], TensorType[..., "M", "N"]]:
         """
         (Optional) define a preconditioner (:math:`\mathbf P`) for linear conjugate gradients
 
@@ -637,7 +642,9 @@ class LinearOperator(ABC):
 
         return res
 
-    def _root_decomposition(self) -> Union[torch.Tensor, "LinearOperator"]:
+    def _root_decomposition(
+        self: LinearOperatorType[..., "N", "N"]
+    ) -> Union[LinearOperatorType[..., "N", "N"], TensorType[..., "N", "N"]]:
         """
         Returns the (usually low-rank) root of a LinearOperator of a PSD matrix.
 
@@ -670,10 +677,10 @@ class LinearOperator(ABC):
         return settings.max_root_decomposition_size.value()
 
     def _root_inv_decomposition(
-        self,
+        self: LinearOperatorType[..., "N", "N"],
         initial_vectors: Optional[torch.Tensor] = None,
         test_vectors: Optional[torch.Tensor] = None,
-    ) -> LinearOperator:
+    ) -> LinearOperatorType[..., "N", "N"]:
         """
         Returns the (usually low-rank) inverse root of a LinearOperator of a PSD matrix.
 
@@ -727,7 +734,12 @@ class LinearOperator(ABC):
                 if arg.dtype in (torch.float, torch.double, torch.half):
                     arg.requires_grad_(val)
 
-    def _solve(self, rhs: torch.Tensor, preconditioner: Callable, num_tridiag: int = 0) -> torch.Tensor:
+    def _solve(
+        self: LinearOperatorType[..., "N", "N"],
+        rhs: TensorType[..., "N", "C"],
+        preconditioner: Callable,
+        num_tridiag: int = 0,
+    ) -> TensorType[..., "N", "C"]:
         r"""
         TODO
         """
@@ -800,7 +812,9 @@ class LinearOperator(ABC):
         return SumBatchLinearOperator(self, block_dim=dim)
 
     @cached(name="svd")
-    def _svd(self) -> Tuple["LinearOperator", Tensor, "LinearOperator"]:
+    def _svd(
+        self: LinearOperatorType[..., "N", "N"]
+    ) -> Tuple[LinearOperatorType[..., "N", "N"], TensorType["N"], LinearOperatorType[..., "N", "N"]]:
         """Method that allows implementing special-cased SVD computation. Should not be called directly"""
         # Using symeig is preferable here for psd LinearOperators.
         # Will need to overwrite this function for non-psd LinearOperators.
@@ -811,7 +825,9 @@ class LinearOperator(ABC):
         V = evecs
         return U, S, V
 
-    def _symeig(self, eigenvectors: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, "LinearOperator"]]:
+    def _symeig(
+        self: LinearOperatorType[..., "N", "N"], eigenvectors: bool = False
+    ) -> Union[TensorType["C"], Tuple[TensorType["C"], LinearOperatorType[..., "N", "C"]]]:
         r"""
         Method that allows implementing special-cased symeig computation. Should not be called directly
         """
@@ -832,7 +848,9 @@ class LinearOperator(ABC):
             evecs = None
         return evals, evecs
 
-    def _t_matmul(self, rhs: torch.Tensor) -> LinearOperator:
+    def _t_matmul(
+        self: LinearOperatorType[..., "M", "N"], rhs: LinearOperatorType[..., "M", "C"]
+    ) -> LinearOperatorType[..., "N", "C"]:
         r"""
         Performs a transpose matrix multiplication :math:`\mathbf K^\top \mathbf M` with the
         (... x M x N) matrix :math:`\mathbf K` that this LinearOperator represents.
@@ -850,13 +868,17 @@ class LinearOperator(ABC):
         return self.mT._matmul(rhs)
 
     @_implements(torch.abs)
-    def abs(self) -> "LinearOperator":
+    def abs(self: LinearOperatorType[..., "M", "N"]) -> LinearOperatorType[..., "M", "N"]:
         # Only implemented by some LinearOperator subclasses
         # We define it here so that we can map the torch function torch.abs to the LinearOperator method
         raise NotImplementedError(f"torch.abs({self.__class__.__name__}) is not implemented.")
 
     @_implements_symmetric(torch.add)
-    def add(self, other: Union[torch.Tensor, "LinearOperator"], alpha: float = None) -> LinearOperator:
+    def add(
+        self: LinearOperatorType[..., "M", "N"],
+        other: Union[TensorType[..., "M", "N"], LinearOperatorType[..., "M", "N"]],
+        alpha: float = None,
+    ) -> LinearOperatorType[..., "M", "N"]:
         r"""
         Each element of the tensor :attr:`other` is multiplied by the scalar :attr:`alpha`
         and added to each element of the :obj:`~linear_operator.operators.LinearOperator`.
@@ -875,7 +897,9 @@ class LinearOperator(ABC):
         else:
             return self + alpha * other
 
-    def add_diagonal(self, diag: torch.Tensor) -> LinearOperator:
+    def add_diagonal(
+        self: LinearOperatorType[..., "N", "N"], diag: TensorType[..., "C"]
+    ) -> LinearOperatorType[..., "N", "N"]:
         r"""
         Adds an element to the diagonal of the matrix.
 
@@ -922,7 +946,9 @@ class LinearOperator(ABC):
 
         return AddedDiagLinearOperator(self, diag_tensor)
 
-    def add_jitter(self, jitter_val: float = 1e-3) -> LinearOperator:
+    def add_jitter(
+        self: LinearOperatorType[..., "N", "N"], jitter_val: float = 1e-3
+    ) -> LinearOperatorType[..., "N", "N"]:
         r"""
         Adds jitter (i.e., a small diagonal component) to the matrix this
         LinearOperator represents.
@@ -937,13 +963,13 @@ class LinearOperator(ABC):
         return self.add_diagonal(diag)
 
     def add_low_rank(
-        self,
-        low_rank_mat: torch.Tensor,
+        self: LinearOperatorType[..., "N", "N"],
+        low_rank_mat: TensorType[..., "N", "C"],
         root_decomp_method: Optional[str] = None,
         root_inv_decomp_method: Optional[str] = None,
         generate_roots: Optional[bool] = True,
         **root_decomp_kwargs,
-    ) -> "SumLinearOperator":  # noqa F811
+    ) -> LinearOperatorType[..., "N", "N"]:
         r"""
         Adds a low rank matrix to the matrix that this LinearOperator represents, e.g.
         computes :math:`\mathbf A + \mathbf{BB}^\top`.
@@ -1069,13 +1095,13 @@ class LinearOperator(ABC):
         return self.shape[:-2]
 
     def cat_rows(
-        self,
-        cross_mat: torch.Tensor,
-        new_mat: torch.Tensor,
+        self: LinearOperatorType[..., "M", "N"],
+        cross_mat: TensorType[..., "O", "N"],
+        new_mat: TensorType[..., "O", "N"],
         generate_roots: bool = True,
         generate_inv_roots: bool = True,
         **root_decomp_kwargs,
-    ) -> LinearOperator:
+    ) -> LinearOperatorType[..., "M" + "O", "N" + "O"]:
         r"""
         Concatenates new rows and columns to the matrix that this LinearOperator represents, e.g.
 
@@ -1218,7 +1244,7 @@ class LinearOperator(ABC):
         return new_linear_op
 
     @_implements(torch.linalg.cholesky)
-    def cholesky(self, upper: bool = False) -> "TriangularLinearOperator":  # noqa F811
+    def cholesky(self: LinearOperatorType[..., "N", "N"], upper: bool = False) -> LinearOperatorType[..., "N", "N"]:
         """
         Cholesky-factorizes the LinearOperator.
 
@@ -1302,7 +1328,9 @@ class LinearOperator(ABC):
         return self
 
     @_implements(torch.diagonal)
-    def diagonal(self, offset: int = 0, dim1: int = -2, dim2: int = -1) -> torch.Tensor:
+    def diagonal(
+        self: LinearOperatorType[..., "N", "N"], offset: int = 0, dim1: int = -2, dim2: int = -1
+    ) -> TensorType[..., "N"]:
         r"""
         As :func:`torch.diagonal`, returns the diagonal of the matrix
         :math:`\mathbf A` this LinearOperator represents as a vector.
@@ -1328,7 +1356,9 @@ class LinearOperator(ABC):
         return self._diagonal()
 
     @cached(name="diagonalization")
-    def diagonalization(self, method: Optional[str] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def diagonalization(
+        self: LinearOperatorType[..., "N", "N"], method: Optional[str] = None
+    ) -> Tuple[TensorType["C"], LinearOperatorType[..., "N", "C"]]:
         """
         Returns a (usually partial) diagonalization of a symmetric PSD matrix.
         Options are either "lanczos" or "symeig". "lanczos" runs Lanczos while

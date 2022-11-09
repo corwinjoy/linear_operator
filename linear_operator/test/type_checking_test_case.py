@@ -11,11 +11,6 @@ from typeguard import typechecked
 
 from linear_operator.operators import DenseLinearOperator, LinearOperatorType
 
-# For flake8, matrix dimensions
-M = None
-C = None
-N = None
-
 patch_typeguard()  # use before @typechecked
 
 
