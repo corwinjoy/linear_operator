@@ -1,0 +1,98 @@
+from typing import List, Union
+
+import torch
+
+from linear_operator import LinearOperator, to_linear_operator
+
+# from linear_operator.operators.zero_linear_operator import ZeroLinearOperator
+# from linear_operator.operators.dense_linear_operators import DenseLinearOperator
+
+
+class BlockBLockLinearOperator(LinearOperator):
+    def __init__(self, linear_operators: List[List[LinearOperator]]) -> None:
+        assert len(linear_operators) > 0, "must have nested list"
+        assert len(linear_operators[0]) == len(linear_operators), "must be square over block dimensions"
+
+        self.linear_operators = linear_operators
+        self.num_tasks = len(self.linear_operators)
+
+    def _matmul(self, other: Union[LinearOperator, torch.Tensor]) -> LinearOperator:
+        T = self.num_tasks
+
+        output = []
+        for i in range(T):
+            tmp = []
+            for j in range(T):
+                tmp.append([])
+            output.append(tmp)
+
+        if isinstance(other, self.__class__):
+            # TO DO: Check size is the same
+            for i in range(T):
+                for j in range(T):
+                    out_ij = to_linear_operator(
+                        torch.zeros(self.linear_operators[0][0].shape[0], other.linear_operators[0][0].shape[1])
+                    )
+                    for k in range(T):
+                        out_ij += self.linear_operators[i][k] @ other.linear_operators[k][j]
+                    output[i][j] = out_ij
+        elif isinstance(other, torch.Tensor):
+            # Check both matrix dims divisible by T,
+            # reshape to (T, T, ), call .from_tensor
+            pass
+
+        elif isinstance(other, LinearOperator):
+            pass
+
+        else:
+            raise Exception("")
+
+        return self.__class__(output)
+
+    def to_dense(self) -> torch.Tensor:
+        out = []
+        for i in range(self.num_tasks):
+            rows = []
+            for j in range(self.num_tasks):
+                rows.append(self.linear_operators[i][j].to_dense())
+            out.append(torch.concat(rows, axis=1))
+        return torch.concat(out, axis=0)
+
+    def _size(self):
+        sz = self.linear_operators[0][0].size()
+        return torch.Size([self.num_tasks * sz[0], self.num_tasks * sz[1]])
+
+    def _diag(self):
+        out = []
+        for i in range(self.num_tasks):
+            diagonal = self.linear_operators[i][i].diagonal()
+            out.append(diagonal)
+        return torch.concat(out, axis=1)
+
+    def _transpose_nonbatch(self):
+        return self  # Diagonal matrices are symmetric
+
+    @classmethod
+    def from_tensor(cls, tensor: torch.Tensor, T: int):
+        los = [[to_linear_operator(t[0]) for t in list(torch.tensor_split(tensor[i], T))] for i in range(T)]
+        return cls(los)
+
+
+rem = """
+
+T = 2
+N = 4
+M = 3
+K = 5
+
+A = torch.randn(T, T, N, M)
+B = torch.randn(T, T, M, K)
+
+A_blo = BlockBLockLinearOperator.from_tensor(A, T)
+B_blo = BlockBLockLinearOperator.from_tensor(B, T)
+C_blo = A_blo._matmul(B_blo)
+
+C = A.permute(0, 2, 1, 3).reshape(T * N, T * M) @ B.permute(0, 2, 1, 3).reshape(T * M, T * K)
+C - C_blo.to_dense()
+
+"""
