@@ -1,11 +1,10 @@
 from typing import List, Union
 
 import torch
+from torch import Tensor
 
-from linear_operator import LinearOperator, to_linear_operator
-
-# from linear_operator.operators.zero_linear_operator import ZeroLinearOperator
-# from linear_operator.operators.dense_linear_operators import DenseLinearOperator
+from ._linear_operator import LinearOperator
+from .dense_linear_operator import to_linear_operator
 
 
 class BlockBLockLinearOperator(LinearOperator):
@@ -13,12 +12,14 @@ class BlockBLockLinearOperator(LinearOperator):
         assert len(linear_operators) > 0, "must have nested list"
         assert len(linear_operators[0]) == len(linear_operators), "must be square over block dimensions"
 
+        super().__init__(linear_operators)
+
         self.linear_operators = linear_operators
         self.num_tasks = len(self.linear_operators)
 
     def _matmul(self, other: Union[LinearOperator, torch.Tensor]) -> LinearOperator:
-        T = self.num_tasks
 
+        T = self.num_tasks
         output = []
         for i in range(T):
             tmp = []
@@ -36,7 +37,7 @@ class BlockBLockLinearOperator(LinearOperator):
                     for k in range(T):
                         out_ij += self.linear_operators[i][k] @ other.linear_operators[k][j]
                     output[i][j] = out_ij
-        elif isinstance(other, torch.Tensor):
+        elif isinstance(other, Tensor):
             # Check both matrix dims divisible by T,
             # reshape to (T, T, ), call .from_tensor
             pass
@@ -49,7 +50,7 @@ class BlockBLockLinearOperator(LinearOperator):
 
         return self.__class__(output)
 
-    def to_dense(self) -> torch.Tensor:
+    def to_dense(self) -> Tensor:
         out = []
         for i in range(self.num_tasks):
             rows = []
@@ -73,26 +74,8 @@ class BlockBLockLinearOperator(LinearOperator):
         return self  # Diagonal matrices are symmetric
 
     @classmethod
-    def from_tensor(cls, tensor: torch.Tensor, T: int):
-        los = [[to_linear_operator(t[0]) for t in list(torch.tensor_split(tensor[i], T))] for i in range(T)]
+    def from_tensor(cls, tensor: Tensor, num_tasks: int):
+        los = [
+            [to_linear_operator(t[0]) for t in list(torch.tensor_split(tensor[i], num_tasks))] for i in range(num_tasks)
+        ]
         return cls(los)
-
-
-rem = """
-
-T = 2
-N = 4
-M = 3
-K = 5
-
-A = torch.randn(T, T, N, M)
-B = torch.randn(T, T, M, K)
-
-A_blo = BlockBLockLinearOperator.from_tensor(A, T)
-B_blo = BlockBLockLinearOperator.from_tensor(B, T)
-C_blo = A_blo._matmul(B_blo)
-
-C = A.permute(0, 2, 1, 3).reshape(T * N, T * M) @ B.permute(0, 2, 1, 3).reshape(T * M, T * K)
-C - C_blo.to_dense()
-
-"""

@@ -3,6 +3,7 @@
 from ._linear_operator import LinearOperator, to_dense
 from .added_diag_linear_operator import AddedDiagLinearOperator
 from .batch_repeat_linear_operator import BatchRepeatLinearOperator
+from .block_block_linear_operator import BlockBLockLinearOperator
 from .block_diag_linear_operator import BlockDiagLinearOperator
 from .block_interleaved_linear_operator import BlockInterleavedLinearOperator
 from .block_linear_operator import BlockLinearOperator
@@ -43,6 +44,7 @@ __all__ = [
     "BatchRepeatLinearOperator",
     "BlockLinearOperator",
     "BlockDiagLinearOperator",
+    "BlockBLockLinearOperator",
     "BlockInterleavedLinearOperator",
     "CatLinearOperator",
     "CholLinearOperator",
