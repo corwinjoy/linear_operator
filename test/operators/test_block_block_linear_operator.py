@@ -19,8 +19,8 @@ class TestBlockBlockSimple(BaseTestCase, unittest.TestCase):
         A = torch.randn(T, T, N, M)
         B = torch.randn(T, T, M, K)
 
-        A_blo = BlockBLockLinearOperator.from_tensor(A, T)
-        B_blo = BlockBLockLinearOperator.from_tensor(B, T)
+        A_blo = BlockBLockLinearOperator.from_tensor(A)
+        B_blo = BlockBLockLinearOperator.from_tensor(B)
         res = A_blo._matmul(B_blo)
         res_dense = res.to_dense()
 
@@ -40,7 +40,7 @@ class TestBlockBlockLinearOperator(LinearOperatorTestCase, unittest.TestCase):
     B = torch.randn(T, T, M, K)
 
     def create_linear_op(self):
-        A_blo = BlockBLockLinearOperator.from_tensor(self.A, self.T)
+        A_blo = BlockBLockLinearOperator.from_tensor(self.A)
         return A_blo
 
     def evaluate_linear_op(self, linear_op):
