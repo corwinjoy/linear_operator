@@ -22,9 +22,10 @@ class TestBlockBlockSimple(BaseTestCase, unittest.TestCase):
         A_blo = BlockBLockLinearOperator.from_tensor(A, T)
         B_blo = BlockBLockLinearOperator.from_tensor(B, T)
         res = A_blo._matmul(B_blo)
+        res_dense = res.to_dense()
 
         expected = A.permute(0, 2, 1, 3).reshape(T * N, T * M) @ B.permute(0, 2, 1, 3).reshape(T * M, T * K)
-        self.assertAllClose(res.to_dense(), expected)
+        self.assertAllClose(res_dense, expected)
 
 
 class TestBlockBlockLinearOperator(LinearOperatorTestCase, unittest.TestCase):
