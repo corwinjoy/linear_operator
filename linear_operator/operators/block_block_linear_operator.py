@@ -21,7 +21,6 @@ class BlockBLockLinearOperator(LinearOperator):
         self.blocks = blocks
 
     def _matmul(self, other: Union[LinearOperator, torch.Tensor]) -> LinearOperator:
-
         T = self.blocks.size(0)
         if isinstance(other, self.__class__):
             # Check size is the same
@@ -40,9 +39,7 @@ class BlockBLockLinearOperator(LinearOperator):
             # Check both matrix dims divisible by T,
             # reshape to (T, T, ), call block multiplication
             if other.size(0) % T == 0 and other.size(1) % T == 0:
-                N = other.size(0) // T
-                M = other.size(1) // T
-                other_blocks = other.reshape(T, N, T, M).permute(0, 2, 1, 3)
+                other_blocks = self.from_2D(other, T)
                 other_op = BlockBLockLinearOperator(other_blocks)
                 return self._matmul(other_op)
 
@@ -52,14 +49,21 @@ class BlockBLockLinearOperator(LinearOperator):
         return res
 
     def to_dense(self) -> Tensor:
+        return self.to_2D()
+
+    def to_2D(self) -> Tensor:
         T = self.blocks.size(0)
-        out = []
-        for i in range(T):
-            rows = []
-            for j in range(T):
-                rows.append(self.blocks[i, j].to_dense())
-            out.append(torch.concat(rows, axis=1))
-        return torch.concat(out, axis=0)
+        N = self.blocks.size(-2)
+        M = self.blocks.size(-1)
+        blocks_dense = self.blocks.permute(0, 2, 1, 3).reshape(T * N, T * M)
+        return blocks_dense
+
+    @staticmethod
+    def from_2D(A: Tensor, T: int) -> Tensor:
+        N = A.size(0) // T
+        M = A.size(1) // T
+        A_blocks = A.reshape(T, N, T, M).permute(0, 2, 1, 3)
+        return A_blocks
 
     def _size(self):
         sz = self.blocks[0, 0].size()
@@ -121,5 +125,8 @@ class BlockBLockLinearOperator(LinearOperator):
         return self  # Diagonal matrices are symmetric
 
     @classmethod
-    def from_tensor(cls, tensor: Tensor):
+    def from_tensor(cls, tensor: Tensor, T: int = 1):
+        if len(tensor.size()) == 2:
+            blocks = cls.from_2D(tensor, T)
+            return cls(blocks)
         return cls(tensor)
