@@ -32,12 +32,11 @@ class TestBlockBlockLinearOperator(LinearOperatorTestCase, unittest.TestCase):
     seed = 0
     should_test_sample = False
     T = 2
-    N = 4
-    M = 3
-    K = 5
+    N = M = 4  # Try a square for this set of tests
+    # N = 4
+    # M = 3
 
-    A = torch.randn(T, T, N, M)
-    B = torch.randn(T, T, M, K)
+    A = torch.randn(T, T, N, M)  # Need to make something +ve definite
 
     def create_linear_op(self):
         A_blo = BlockBLockLinearOperator.from_tensor(self.A)
