@@ -21,11 +21,27 @@ class TestBlockBlockSimple(BaseTestCase, unittest.TestCase):
 
         A_blo = BlockBLockLinearOperator.from_tensor(A)
         B_blo = BlockBLockLinearOperator.from_tensor(B)
-        res = A_blo._matmul(B_blo)
-        res_dense = res.to_dense()
+        res_AB = A_blo._matmul(B_blo)
+        res_dense_AB = res_AB.to_dense()
 
-        expected = A.permute(0, 2, 1, 3).reshape(T * N, T * M) @ B.permute(0, 2, 1, 3).reshape(T * M, T * K)
-        self.assertAllClose(res_dense, expected)
+        A_dense = A.permute(0, 2, 1, 3).reshape(T * N, T * M)
+        B_dense = B.permute(0, 2, 1, 3).reshape(T * M, T * K)
+        expected = A_dense @ B_dense
+        self.assertAllClose(res_dense_AB, expected)
+        self.assertAllClose(A_dense, A_blo.to_dense())
+        self.assertAllClose(B_dense, B_blo.to_dense())
+
+        # Try to convert dense to block
+        Ne = A_dense.size(0) // T
+        Me = A_dense.size(1) // T
+        A_blocks_est = A_dense.reshape(T, Ne, T, Me)
+        A_blocks_est = A_blocks_est.permute(0, 2, 1, 3)
+        self.assertAllClose(A, A_blocks_est)
+
+        # Check Tensor multiplication
+        res_tensor_AB = A_blo._matmul(B_dense)
+        res_tensor_dense_AB = res_tensor_AB.to_dense()
+        self.assertAllClose(res_dense_AB, res_tensor_dense_AB)
 
 
 class TestBlockBlockLinearOperator(LinearOperatorTestCase, unittest.TestCase):
@@ -36,10 +52,13 @@ class TestBlockBlockLinearOperator(LinearOperatorTestCase, unittest.TestCase):
     # N = 4
     # M = 3
 
-    A = torch.randn(T, T, N, M)  # Need to make something +ve definite
+    A_dense = torch.eye(T * N)
+    A_blocks = A_dense.reshape(T, N, T, M).permute(0, 2, 1, 3)
+
+    # A = torch.randn(T, T, N, M)  # Need to make something +ve definite
 
     def create_linear_op(self):
-        A_blo = BlockBLockLinearOperator.from_tensor(self.A)
+        A_blo = BlockBLockLinearOperator.from_tensor(self.A_blocks)
         return A_blo
 
     def evaluate_linear_op(self, linear_op):

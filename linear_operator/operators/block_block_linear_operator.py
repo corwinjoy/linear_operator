@@ -11,14 +11,22 @@ class BlockBLockLinearOperator(LinearOperator):
         assert len(blocks.size()) > 2, "must have nested list"
         assert blocks.size(-3) == blocks.size(-4), "must be square over block dimensions"
 
+        if len(blocks.size()) > 4:
+            blocks = blocks.squeeze()
+
+        assert (len(blocks.size())) < 5, "batch dimensions are not supported"
+
         super().__init__(blocks)
 
         self.blocks = blocks
 
     def _matmul(self, other: Union[LinearOperator, torch.Tensor]) -> LinearOperator:
+
+        T = self.blocks.size(0)
         if isinstance(other, self.__class__):
-            # TO DO: Check size is the same
-            T = self.blocks.size(0)
+            # Check size is the same
+            assert T == other.blocks.size(0)
+            assert T == other.blocks.size(1)
             output_shape = torch.Size(self.blocks.size()[:3] + (other.blocks.size(3),))
             output = torch.zeros(output_shape)
             for i in range(T):
@@ -27,18 +35,21 @@ class BlockBLockLinearOperator(LinearOperator):
                     for k in range(T):
                         out_ij += self.blocks[i, k] @ other.blocks[k, j]
                     output[i, j] = out_ij
+            return self.__class__(output)
         elif isinstance(other, Tensor):
             # Check both matrix dims divisible by T,
-            # reshape to (T, T, ), call .from_tensor
-            raise NotImplementedError("_matmul against Tensor not implemented for BlockBLockLinearOperator")
+            # reshape to (T, T, ), call block multiplication
+            if other.size(0) % T == 0 and other.size(1) % T == 0:
+                N = other.size(0) // T
+                M = other.size(1) // T
+                other_blocks = other.reshape(T, N, T, M).permute(0, 2, 1, 3)
+                other_op = BlockBLockLinearOperator(other_blocks)
+                return self._matmul(other_op)
 
-        elif isinstance(other, LinearOperator):
-            raise NotImplementedError("_matmul against LinearOperator not implemented for BlockBLockLinearOperator")
-
-        else:
-            raise Exception("_matmul for BlockBLockLinearOperator pass unrecognized class type")
-
-        return self.__class__(output)
+        A = self.to_dense()
+        B = other.to_dense()
+        res = A @ B
+        return res
 
     def to_dense(self) -> Tensor:
         T = self.blocks.size(0)
@@ -54,6 +65,10 @@ class BlockBLockLinearOperator(LinearOperator):
         sz = self.blocks[0, 0].size()
         T = self.blocks.size(0)
         return torch.Size((T * sz[0], T * sz[1]))
+
+    @property
+    def matrix_shape(self) -> torch.Size:
+        return self._size()
 
     def _diag(self):
         T = self.blocks.size(0)
